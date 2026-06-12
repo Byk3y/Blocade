@@ -1,69 +1,46 @@
-import { useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { useMemo } from 'react';
+import { Animated, View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Board, BlockSpec } from '@/components/Board';
+import { BlockTray } from '@/components/BlockTray';
+import { PlayerCard } from '@/components/PlayerCard';
+import { SpeechBubble } from '@/components/SpeechBubble';
 import { PrimaryButton } from '@/components/Buttons';
-import { colors, fonts, s } from '@/constants/theme';
-import { Cell, tutorialCells } from '@/constants/game-data';
-
-/** 5×5 tutorial board variants. Design pitch: 30px cells, 5px gaps (P=35). */
-function makeTutCells(opts: { dots?: [number, number][]; you?: [number, number]; opp?: [number, number] }): Cell[] {
-  const cells: Cell[] = [];
-  for (let r = 0; r < 5; r++) {
-    for (let c = 0; c < 5; c++) {
-      let bg: string = colors.boardCell;
-      if (r === 0) bg = colors.goalBlue;
-      if (r === 4) bg = colors.goalOrange;
-      cells.push({
-        bg,
-        dot: opts.dots?.some((d) => d[0] === r && d[1] === c) ?? false,
-        piece:
-          opts.you && r === opts.you[0] && c === opts.you[1]
-            ? 'blue'
-            : opts.opp && r === opts.opp[0] && c === opts.opp[1]
-              ? 'orange'
-              : null,
-      });
-    }
-  }
-  return cells;
-}
-
-const STEPS: { title: string; body: string; cells: Cell[]; blocks: BlockSpec[] }[] = [
-  {
-    title: 'Race to the far side',
-    body: 'Move one cell per turn. Reach any cell of the tinted row on the far side before your rival reaches yours.',
-    cells: makeTutCells({ you: [3, 2], opp: [0, 2], dots: [[2, 2], [3, 1], [3, 3]] }),
-    blocks: [],
-  },
-  {
-    title: 'Wall them off',
-    body: 'Drag a block between lanes to slow your rival down. Blocks span two cells — and you only get ten.',
-    cells: tutorialCells,
-    blocks: [
-      { x: 35, y: 64, w: 65, h: 7, variant: 'ink' },
-      { x: 70, y: 29, w: 65, h: 7, variant: 'ghost' },
-    ],
-  },
-  {
-    title: 'Jump when face-to-face',
-    body: 'If your rival is directly in front of you, leap straight over them. Blocked behind? Step diagonally around instead.',
-    cells: makeTutCells({ you: [3, 2], opp: [2, 2], dots: [[1, 2]] }),
-    blocks: [],
-  },
-];
+import { Grad } from '@/components/Grad';
+import { colors, fonts, gradients, s } from '@/constants/theme';
+import { Cell, botByName, makeTicks, wallRect } from '@/constants/game-data';
+import { GameState, Pos, samePos } from '@/engine';
+import { useTutorial } from '@/hooks/use-tutorial';
+import { useWallDrag } from '@/hooks/use-wall-drag';
 
 export default function HowToPlay() {
   const router = useRouter();
-  const [step, setStep] = useState(1); // mock shows card 2
+  const pebble = botByName('Pebble');
+  const tut = useTutorial();
+  const { state, glow, wallPhase, won, busy } = tut;
 
-  const next = () => {
-    if (step < STEPS.length - 1) setStep(step + 1);
-    else router.back();
-  };
+  const drag = useWallDrag({
+    enabled: () => tut.wallPhase,
+    getState: () => tut.state,
+    placeWall: tut.placeWall,
+    onTapWell: tut.onTapWell,
+  });
 
-  const current = STEPS[step];
+  const cells = useMemo(() => buildCells(state, glow), [state, glow]);
+
+  const blocks = useMemo<BlockSpec[]>(() => {
+    const out: BlockSpec[] = state.walls.map((w) => ({ ...wallRect(w), variant: 'ink' }));
+    if (tut.targetWall && !drag.drag) {
+      out.push({ ...wallRect(tut.targetWall), variant: 'ghost' });
+    }
+    if (drag.drag && drag.drag.wall.r >= 0) {
+      out.push({ ...wallRect(drag.drag.wall), variant: drag.drag.valid ? 'ghost' : 'ghost-bad' });
+    }
+    return out;
+  }, [state.walls, tut.targetWall, drag.drag]);
+
+  const leave = () => router.replace('/');
 
   return (
     <Screen edges={['top', 'bottom']}>
@@ -83,100 +60,216 @@ export default function HowToPlay() {
             letterSpacing: -0.3,
             color: colors.ink,
           }}>
-          How to play
+          Learn to play
         </Text>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={leave} hitSlop={12}>
           <Text style={{ fontFamily: fonts.satoshiBold, fontSize: s(13), color: colors.textMuted }}>
             Skip
           </Text>
         </Pressable>
       </View>
 
-      {/* card */}
+      {/* Pebble */}
+      <View style={{ marginHorizontal: s(16) }}>
+        <PlayerCard
+          name={pebble?.name ?? 'Pebble'}
+          rating={pebble?.rating ?? 320}
+          subline={busy ? 'Taking his turn…' : 'Racing you to the bottom row'}
+          avatar={(pebble?.avatar ?? gradients.orangeAvatar) as readonly [string, string]}
+          eyes={pebble?.eyes ?? 'round'}
+          mouth="smile"
+          accent="orange"
+          active={busy && !won}
+          ticks={makeTicks(state.players[1].wallsLeft, colors.rivalOrange)}
+        />
+      </View>
+
+      <SpeechBubble text={tut.bubble} />
+
+      {/* board + tray + coach */}
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: s(10) }}>
+        <Board
+          cells={cells}
+          blocks={blocks}
+          dotColor={colors.blue}
+          onCellPress={tut.tapCell}
+          onMeasureGrid={drag.setGridFrame}
+        />
+        <BlockTray
+          remaining={state.players[0].wallsLeft}
+          active={drag.drag ? drag.drag.o : null}
+          accent={colors.blue}
+          hint={
+            wallPhase
+              ? drag.drag
+                ? 'Drop it on the lane below Pebble'
+                : 'Drag the flat block onto the board'
+              : 'You’ll place blocks in a moment'
+          }
+          panHandlersFor={drag.panHandlersFor}
+        />
+        <Text
+          numberOfLines={2}
+          style={{
+            fontFamily: fonts.satoshiMedium,
+            fontSize: s(12.5),
+            lineHeight: s(18),
+            textAlign: 'center',
+            maxWidth: s(320),
+            color: tut.isNudge ? colors.rivalOrange : colors.textSecondary,
+          }}>
+          {tut.coach}
+        </Text>
+      </View>
+
+      {/* you + progress */}
+      <View style={{ marginHorizontal: s(16), marginBottom: s(8) }}>
+        <PlayerCard
+          name="You"
+          rating={1210}
+          subline="First to the far side wins"
+          avatar={gradients.blueAvatar}
+          active={!busy && !won}
+          ticks={makeTicks(state.players[0].wallsLeft, colors.blue)}
+        />
+      </View>
       <View
         style={{
-          flex: 1,
+          flexDirection: 'row',
+          alignSelf: 'center',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: s(26),
-          paddingHorizontal: s(28),
+          gap: s(6),
+          marginBottom: s(10),
         }}>
-        <View
-          style={{
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.surfaceBorder,
-            borderRadius: s(24),
-            padding: s(18),
-            shadowColor: '#22262e',
-            shadowOpacity: 0.1,
-            shadowRadius: 34,
-            shadowOffset: { width: 0, height: 14 },
-            elevation: 8,
-          }}>
-          <Board
-            cells={current.cells}
-            n={5}
-            cell={30}
-            gap={5}
-            blocks={current.blocks}
-            card={false}
-            padding={0}
+        {Array.from({ length: tut.beatCount }, (_, i) => (
+          <View
+            key={i}
+            style={{
+              width: i === tut.beatIndex ? s(18) : s(6),
+              height: s(6),
+              borderRadius: s(3),
+              backgroundColor: i <= tut.beatIndex ? colors.blue : '#d8d2c2',
+            }}
           />
-        </View>
-
-        <View style={{ alignItems: 'center', gap: s(9) }}>
-          <Text
-            style={{
-              fontFamily: fonts.satoshiBlack,
-              fontSize: s(10),
-              letterSpacing: 2,
-              color: colors.label,
-            }}>
-            STEP {step + 1} OF 3
-          </Text>
-          <Text
-            style={{
-              fontFamily: fonts.clashSemibold,
-              fontSize: s(27),
-              letterSpacing: -0.3,
-              color: colors.ink,
-            }}>
-            {current.title}
-          </Text>
-          <Text
-            style={{
-              fontFamily: fonts.satoshi,
-              fontSize: s(14),
-              lineHeight: s(22),
-              color: colors.textSecondary,
-              textAlign: 'center',
-              maxWidth: s(280),
-            }}>
-            {current.body}
-          </Text>
-        </View>
-
-        {/* page dots — active is an 18×6 blue pill */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
-          {STEPS.map((_, i) => (
-            <Pressable key={i} onPress={() => setStep(i)} hitSlop={8}>
-              <View
-                style={{
-                  width: i === step ? s(18) : s(6),
-                  height: s(6),
-                  borderRadius: s(3),
-                  backgroundColor: i === step ? colors.blue : '#d8d2c2',
-                }}
-              />
-            </Pressable>
-          ))}
-        </View>
+        ))}
       </View>
 
-      <View style={{ paddingHorizontal: s(20), paddingBottom: s(10) }}>
-        <PrimaryButton label={step === STEPS.length - 1 ? 'Let’s play' : 'Next'} onPress={next} />
-      </View>
+      {/* the block being dragged — follows the finger above everything */}
+      {drag.drag && (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            transform: [
+              { translateX: drag.floatXY.x },
+              { translateY: drag.floatXY.y },
+              { rotate: '-3deg' },
+            ],
+          }}>
+          <Grad
+            colors={gradients.blockInk}
+            angle={drag.drag.o === 'h' ? 180 : 90}
+            style={{
+              width: drag.drag.o === 'h' ? s(74) : s(12),
+              height: drag.drag.o === 'h' ? s(12) : s(74),
+              borderRadius: s(6),
+              opacity: 0.96,
+              shadowColor: '#22262e',
+              shadowOpacity: 0.45,
+              shadowRadius: 22,
+              shadowOffset: { width: 0, height: 14 },
+              elevation: 14,
+            }}
+          />
+        </Animated.View>
+      )}
+
+      {/* victory card */}
+      {won && (
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            top: 0,
+            justifyContent: 'flex-end',
+            backgroundColor: 'rgba(34,38,46,0.18)',
+          }}>
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderTopLeftRadius: s(28),
+              borderTopRightRadius: s(28),
+              paddingHorizontal: s(24),
+              paddingTop: s(26),
+              paddingBottom: s(28),
+              gap: s(8),
+              ...{
+                shadowColor: '#22262e',
+                shadowOpacity: 0.38,
+                shadowRadius: 50,
+                shadowOffset: { width: 0, height: -16 },
+                elevation: 20,
+              },
+            }}>
+            <Text
+              style={{
+                fontFamily: fonts.satoshiBlack,
+                fontSize: s(10),
+                letterSpacing: 2,
+                color: colors.label,
+              }}>
+              TUTORIAL COMPLETE
+            </Text>
+            <Text
+              style={{
+                fontFamily: fonts.clashSemibold,
+                fontSize: s(28),
+                letterSpacing: -0.3,
+                color: colors.ink,
+              }}>
+              You beat Pebble!
+            </Text>
+            <Text
+              style={{
+                fontFamily: fonts.satoshi,
+                fontSize: s(14),
+                lineHeight: s(21),
+                color: colors.textSecondary,
+                marginBottom: s(8),
+              }}>
+              That’s the whole game: race across, leap when you’re cornered, and wall off your rival.
+              The real opponents won’t go so easy.
+            </Text>
+            <PrimaryButton label="Start playing" onPress={leave} />
+          </View>
+        </View>
+      )}
     </Screen>
   );
+}
+
+/** Project tutorial state onto the design's cell model, with glow targets. */
+function buildCells(state: GameState, glow: Pos[]): Cell[] {
+  const p0 = state.players[0].pos;
+  const p1 = state.players[1].pos;
+  const cells: Cell[] = [];
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      let bg: string = colors.boardCell;
+      if (r === 0) bg = colors.goalBlue;
+      if (r === 8) bg = colors.goalOrange;
+      const here = { r, c };
+      cells.push({
+        bg,
+        dot: glow.some((g) => samePos(g, here)),
+        piece: samePos(p0, here) ? 'blue' : samePos(p1, here) ? 'orange' : null,
+      });
+    }
+  }
+  return cells;
 }
