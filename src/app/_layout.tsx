@@ -3,6 +3,7 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { AuthProvider } from '@/state/auth';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -25,7 +26,7 @@ export default function RootLayout() {
   if (!loaded) return null;
 
   return (
-    <>
+    <AuthProvider>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -39,6 +40,6 @@ export default function RootLayout() {
         <Stack.Screen name="how-to-play" options={{ presentation: 'modal' }} />
         <Stack.Screen name="result" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
-    </>
+    </AuthProvider>
   );
 }
