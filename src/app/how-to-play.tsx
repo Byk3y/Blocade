@@ -13,6 +13,7 @@ import { Cell, botByName, makeTicks, wallRect } from '@/constants/game-data';
 import { GameState, Pos, samePos } from '@/engine';
 import { useTutorial } from '@/hooks/use-tutorial';
 import { useWallDrag } from '@/hooks/use-wall-drag';
+import { markTutorialSeen } from '@/state/tutorial-seen';
 
 export default function HowToPlay() {
   const router = useRouter();
@@ -40,7 +41,13 @@ export default function HowToPlay() {
     return out;
   }, [state.walls, tut.targetWall, drag.drag]);
 
-  const leave = () => router.replace('/');
+  // Mark seen so first-launch never re-shows it, then dismiss back to wherever
+  // it was opened from (Home on first launch, the live match via the in-game ⋯).
+  const leave = () => {
+    markTutorialSeen();
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
 
   return (
     <Screen edges={['top', 'bottom']}>

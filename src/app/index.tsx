@@ -1,6 +1,9 @@
+import { useEffect, useRef } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { useAuth } from '@/state/auth';
+import { hasSeenTutorial } from '@/state/tutorial-seen';
 import { Screen } from '@/components/Screen';
 import { Grad } from '@/components/Grad';
 import { Mascot } from '@/components/Mascot';
@@ -12,6 +15,22 @@ import { pieceGradient } from '@/constants/theme';
 
 export default function Home() {
   const router = useRouter();
+  const { loading } = useAuth();
+  const checkedFirstLaunch = useRef(false);
+
+  // First launch: once the app has settled (silent anon sign-in done), present
+  // the guided first match over Home. Runs at most once per app session.
+  useEffect(() => {
+    if (loading || checkedFirstLaunch.current) return;
+    checkedFirstLaunch.current = true;
+    let cancelled = false;
+    hasSeenTutorial().then((seen) => {
+      if (!cancelled && !seen) router.navigate('/how-to-play');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, router]);
 
   return (
     <Screen>
