@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Animated, View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
@@ -41,8 +41,14 @@ export default function HowToPlay() {
     return out;
   }, [state.walls, tut.targetWall, drag.drag]);
 
-  // Mark seen so first-launch never re-shows it, then dismiss back to wherever
-  // it was opened from (Home on first launch, the live match via the in-game ⋯).
+  // Mark seen no matter HOW the screen is dismissed — Skip, finishing, or a
+  // swipe-down on the iOS modal (which never calls leave()). Without this, a
+  // swipe-dismiss would leave the flag unwritten and re-show the tutorial on
+  // every launch.
+  useEffect(() => () => void markTutorialSeen(), []);
+
+  // Dismiss back to wherever it was opened from (Home on first launch, the live
+  // match via the in-game ⋯).
   const leave = () => {
     markTutorialSeen();
     if (router.canGoBack()) router.back();

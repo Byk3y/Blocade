@@ -98,7 +98,13 @@ export function useGame({
         bot.blunder * (difficultyBlunderScale[difficulty ?? 'Intermediate'] ?? 1),
       );
       const action = chooseBotAction(state, { style: bot.style, blunder, tuning: bot.skill });
-      if (!action) return; // cannot happen with the no-trap rule, but stay safe
+      if (!action) {
+        // Only reachable if the bot is fully walled in (no legal move or wall) —
+        // effectively impossible under the no-trap rule, but surface it instead
+        // of silently freezing the turn.
+        console.warn('[game] bot has no legal action — turn skipped');
+        return;
+      }
       const res = applyAction(state, action);
       if (res.ok) {
         setState(res.state);

@@ -37,7 +37,10 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="play-bots" />
         <Stack.Screen name="game" />
-        <Stack.Screen name="how-to-play" options={{ presentation: 'modal' }} />
+        <Stack.Screen
+          name="how-to-play"
+          options={{ presentation: 'modal', gestureEnabled: false }}
+        />
         <Stack.Screen name="result" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
     </AuthProvider>

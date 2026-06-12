@@ -67,6 +67,35 @@ function assertInvariants(s: GameState, tag: string) {
   }
 }
 
+/**
+ * Independent oracle for move *geometry* — deliberately shares NO code with the
+ * engine's stepBlocked/BFS, so it catches "the engine accepted a move it
+ * shouldn't have" (a teleport, a jump with no opponent at the midpoint, a
+ * diagonal when the opponent isn't beside you). It validates shape only, not
+ * wall-blocking. `from`/`opp` are the positions BEFORE the move.
+ */
+function assertMoveShape(from: { r: number; c: number }, to: { r: number; c: number }, opp: { r: number; c: number }, tag: string) {
+  const dr = to.r - from.r;
+  const dc = to.c - from.c;
+  const adr = Math.abs(dr);
+  const adc = Math.abs(dc);
+  if (adr + adc === 1) return; // orthogonal step
+  if ((adr === 2 && dc === 0) || (dr === 0 && adc === 2)) {
+    // straight jump: opponent must sit at the midpoint
+    const mid = { r: from.r + dr / 2, c: from.c + dc / 2 };
+    assert.ok(samePos(mid, opp), `${tag}: 2-cell jump with no opponent at the midpoint`);
+    return;
+  }
+  if (adr === 1 && adc === 1) {
+    // diagonal side-step: opponent must be the orthogonal neighbour shared with `to`
+    const ok =
+      samePos(opp, { r: from.r + dr, c: from.c }) || samePos(opp, { r: from.r, c: from.c + dc });
+    assert.ok(ok, `${tag}: diagonal move without an adjacent opponent to go around`);
+    return;
+  }
+  assert.fail(`${tag}: move of illegal shape ${JSON.stringify(from)}->${JSON.stringify(to)}`);
+}
+
 /** Fire clearly-illegal actions and assert they're rejected without mutating state. */
 function probeRejections(s: GameState, rng: () => number) {
   const before = JSON.stringify(s);
@@ -119,9 +148,18 @@ function playGame(seed: number, onStep?: (s: GameState) => void): GameState {
     const policy = pol[s.turn];
     const action = chooseBotAction(s, { style: policy.style, blunder: policy.blunder, rng });
     assert.ok(action, `seed ${seed}: bot returned no action`);
+
+    // capture move geometry inputs before the action mutates nothing (engine is pure)
+    const mover = s.turn;
+    const from = s.players[mover].pos;
+    const opp = s.players[1 - mover].pos;
+
     const res = applyAction(s, action!);
     assert.ok(res.ok, `seed ${seed} step ${steps}: bot produced an ILLEGAL action ${JSON.stringify(action)}`);
-    if (res.ok) s = res.state;
+    if (res.ok) {
+      if (action!.type === 'move') assertMoveShape(from, action!.to, opp, `seed ${seed} step ${steps}`);
+      s = res.state;
+    }
     steps++;
   }
   assertInvariants(s, `seed ${seed} final`);
