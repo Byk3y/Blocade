@@ -43,6 +43,13 @@ function assertInvariants(s: GameState, tag: string) {
   }
   const placed = 10 - s.players[0].wallsLeft + (10 - s.players[1].wallsLeft);
   assert.equal(s.walls.length, placed, `${tag}: wall count != walls placed`);
+  for (const p of [0, 1] as PlayerId[]) {
+    assert.equal(
+      s.walls.filter((w) => w.owner === p).length,
+      10 - s.players[p].wallsLeft,
+      `${tag}: p${p} wall ownership count != walls spent`,
+    );
+  }
 
   // wall set internally consistent (no pair overlaps/crosses)
   for (let i = 0; i < s.walls.length; i++) {

@@ -7,7 +7,7 @@ import { Mascot } from '@/components/Mascot';
 import { StatStrip } from '@/components/StatStrip';
 import { PrimaryButton, SecondaryButton, TextButton } from '@/components/Buttons';
 import { colors, fonts, gradients, s } from '@/constants/theme';
-import { Cell, board, botByName, wallRect, walls as demoWalls } from '@/constants/game-data';
+import { Cell, PieceColor, board, botByName, wallRect, walls as demoWalls } from '@/constants/game-data';
 import { GameState, PlayerId, WALLS_PER_PLAYER, routeDist, samePos } from '@/engine';
 import { getLastMatch } from '@/state/match-store';
 
@@ -27,6 +27,8 @@ export default function Result() {
   }>();
 
   const match = getLastMatch();
+  const playerColor: PieceColor = match?.playerColor ?? 'blue';
+  const rivalColor: PieceColor = match?.rivalColor ?? 'orange';
   const local = (match?.mode ?? params.mode) === 'local';
   const winner: PlayerId = match?.winner ?? (params.outcome === 'defeat' || params.outcome === 'p2' ? 1 : 0);
   const win = winner === 0; // "win" = blue side won
@@ -117,10 +119,18 @@ export default function Result() {
         }}>
         <Board
           cells={finalState ? finalCells(finalState) : win ? board.victory : board.defeat}
-          blocks={(finalState ? finalState.walls.map(wallRect) : demoWalls).map((w) => ({
-            ...w,
-            variant: 'ink' as const,
-          }))}
+          blocks={
+            finalState
+              ? finalState.walls.map((w) => ({
+                  ...wallRect(w),
+                  variant: 'ink' as const,
+                  ownerColor: w.owner === 0 ? playerColor : rivalColor,
+                }))
+              : demoWalls.map((w) => ({
+                  ...w,
+                  variant: 'ink' as const,
+                }))
+          }
           emboss={false}
           cardShadow={false}
         />
@@ -202,7 +212,7 @@ export default function Result() {
             style={{
               fontFamily: fonts.clashBold,
               fontSize: s(38),
-              letterSpacing: -0.5,
+              letterSpacing: 0,
               lineHeight: s(40),
               color: colors.ink,
             }}>

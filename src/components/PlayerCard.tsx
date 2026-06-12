@@ -24,17 +24,23 @@ export function PlayerCard({
   eyes?: EyeStyle;
   mouth?: 'smile' | 'flat';
   active?: boolean;
-  /** identity colour for the active state + chip (blue = you, orange = rival) */
-  accent?: 'blue' | 'orange';
+  /** identity colour for the active state + chip. */
+  accent?: 'blue' | 'green' | 'orange';
   chip?: string;
   ticks: string[];
 }) {
-  const accentColor = accent === 'blue' ? colors.blue : colors.rivalOrange;
-  const activeBorder = accent === 'blue' ? 'rgba(47,95,224,0.5)' : 'rgba(232,89,12,0.5)';
+  const accentColor =
+    accent === 'green' ? colors.playerGreen : accent === 'blue' ? colors.blue : colors.rivalOrange;
+  const activeBorder =
+    accent === 'green'
+      ? 'rgba(120,173,78,0.55)'
+      : accent === 'blue'
+        ? 'rgba(47,95,224,0.5)'
+        : 'rgba(232,89,12,0.5)';
   const activeShadow =
     accent === 'blue'
       ? shadows.blueSelection
-      : { ...shadows.blueSelection, shadowColor: colors.rivalOrange };
+      : { ...shadows.blueSelection, shadowColor: accentColor };
   return (
     <View
       style={{
@@ -71,7 +77,7 @@ export function PlayerCard({
                 style={{
                   fontFamily: fonts.satoshiBlack,
                   fontSize: s(9),
-                  letterSpacing: 1.2,
+                  letterSpacing: 0,
                   color: colors.white,
                 }}>
                 {chip}
@@ -90,7 +96,7 @@ export function PlayerCard({
           style={{
             fontFamily: fonts.satoshiBold,
             fontSize: s(9.5),
-            letterSpacing: 1.5,
+            letterSpacing: 0,
             color: colors.label,
           }}>
           BLOCKS

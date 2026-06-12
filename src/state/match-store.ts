@@ -1,3 +1,4 @@
+import type { PieceColor } from '../constants/game-data';
 import type { GameState, PlayerId } from '../engine';
 
 /**
@@ -9,6 +10,8 @@ export interface MatchRecord {
   mode: 'bot' | 'local';
   botName?: string;
   difficulty?: string;
+  playerColor: PieceColor;
+  rivalColor: PieceColor;
   winner: PlayerId;
   finalState: GameState;
 }

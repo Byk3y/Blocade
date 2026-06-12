@@ -25,6 +25,9 @@ export interface Wall {
   c: number;
   o: Orientation;
 }
+export interface PlacedWall extends Wall {
+  owner: PlayerId;
+}
 
 export type Action = { type: 'move'; to: Pos } | { type: 'wall'; wall: Wall };
 
@@ -35,7 +38,7 @@ export interface PlayerState {
 
 export interface GameState {
   players: [PlayerState, PlayerState];
-  walls: Wall[];
+  walls: PlacedWall[];
   turn: PlayerId;
   winner: PlayerId | null;
   /** actions taken by each player */
@@ -88,7 +91,7 @@ export interface WallSets {
   v: Set<number>;
 }
 
-export function wallSets(walls: Wall[], extra?: Wall): WallSets {
+export function wallSets(walls: readonly Wall[], extra?: Wall): WallSets {
   const h = new Set<number>();
   const v = new Set<number>();
   for (const w of walls) (w.o === 'h' ? h : v).add(wkey(w.r, w.c));
@@ -225,7 +228,7 @@ export function routeDist(state: GameState, player: PlayerId, extra?: Wall): num
 // ---- wall placement -------------------------------------------------------
 
 /** Geometric legality only (bounds + overlap/cross), no path check. */
-export function wallFits(walls: Wall[], w: Wall): boolean {
+export function wallFits(walls: readonly Wall[], w: Wall): boolean {
   if (w.r < 0 || w.r > 7 || w.c < 0 || w.c > 7) return false;
   for (const x of walls) {
     if (x.o === w.o) {
@@ -302,7 +305,7 @@ export function applyAction(state: GameState, action: Action): ApplyResult {
   const next: GameState = {
     ...state,
     players,
-    walls: [...state.walls, action.wall],
+    walls: [...state.walls, { ...action.wall, owner: p }],
     turn: (1 - p) as PlayerId,
     moveCounts,
   };

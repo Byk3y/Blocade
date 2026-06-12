@@ -39,6 +39,8 @@ export const colors = {
   // identity
   blue: '#2f5fe0',
   blueDark: '#2243a8',
+  playerGreen: '#78ad4e',
+  greenDark: '#517f34',
   rivalOrange: '#e8590c',
   orangeDark: '#b54607',
   brass: '#c9a45c',
@@ -65,6 +67,9 @@ export const gradients = {
   bluePrimary: ['#4a76f0', '#2f5fe0'] as const, // CTA buttons / your identity
   greenPlay: ['#57b471', '#3b9456'] as const, // match-start button ONLY
   blockInk: ['#2c323c', '#1d222a'] as const, // roadblocks
+  blockBlue: ['#7fa2ff', '#2f5fe0', '#2243a8'] as const,
+  blockGreen: ['#c7e98b', '#78ad4e', '#517f34'] as const,
+  blockOrange: ['#ff9b67', '#e8590c', '#b54607'] as const,
   sheet: ['#fbf8f1', '#f4efe2'] as const,
   blueAvatar: ['#6e96ff', '#2243a8'] as const, // 160deg mascot (you)
   orangeAvatar: ['#ff8a4d', '#cf520c'] as const, // 160deg mascot (rival)
@@ -75,6 +80,7 @@ export const gradients = {
 /** Radial piece gradients: circle at 32% 28%. */
 export const pieceGradient = {
   blue: { stops: ['#6e96ff', '#2f5fe0', '#2243a8'], offsets: [0, 0.58, 1] },
+  green: { stops: ['#b6dc7a', '#78ad4e', '#517f34'], offsets: [0, 0.58, 1] },
   orange: { stops: ['#ffa566', '#e8590c', '#b54607'], offsets: [0, 0.58, 1] },
 } as const;
 

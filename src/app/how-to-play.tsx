@@ -31,7 +31,11 @@ export default function HowToPlay() {
   const cells = useMemo(() => buildCells(state, glow), [state, glow]);
 
   const blocks = useMemo<BlockSpec[]>(() => {
-    const out: BlockSpec[] = state.walls.map((w) => ({ ...wallRect(w), variant: 'ink' }));
+    const out: BlockSpec[] = state.walls.map((w) => ({
+      ...wallRect(w),
+      variant: 'ink',
+      ownerColor: w.owner === 0 ? 'blue' : 'orange',
+    }));
     if (tut.targetWall && !drag.drag) {
       out.push({ ...wallRect(tut.targetWall), variant: 'ghost' });
     }
@@ -70,7 +74,7 @@ export default function HowToPlay() {
           style={{
             fontFamily: fonts.clashSemibold,
             fontSize: s(22),
-            letterSpacing: -0.3,
+            letterSpacing: 0,
             color: colors.ink,
           }}>
           Learn to play
@@ -112,6 +116,7 @@ export default function HowToPlay() {
           remaining={state.players[0].wallsLeft}
           active={drag.drag ? drag.drag.o : null}
           accent={colors.blue}
+          blockColor="blue"
           hint={
             wallPhase
               ? drag.drag
@@ -182,15 +187,18 @@ export default function HowToPlay() {
             ],
           }}>
           <Grad
-            colors={gradients.blockInk}
+            colors={gradients.blockBlue}
             angle={drag.drag.o === 'h' ? 180 : 90}
             style={{
               width: drag.drag.o === 'h' ? s(74) : s(12),
               height: drag.drag.o === 'h' ? s(12) : s(74),
               borderRadius: s(6),
               opacity: 0.96,
-              shadowColor: '#22262e',
-              shadowOpacity: 0.45,
+              borderWidth: 1,
+              borderColor: colors.blue,
+              borderTopColor: 'rgba(255,255,255,0.58)',
+              shadowColor: colors.blue,
+              shadowOpacity: 0.48,
               shadowRadius: 22,
               shadowOffset: { width: 0, height: 14 },
               elevation: 14,
@@ -233,7 +241,7 @@ export default function HowToPlay() {
               style={{
                 fontFamily: fonts.satoshiBlack,
                 fontSize: s(10),
-                letterSpacing: 2,
+                letterSpacing: 0,
                 color: colors.label,
               }}>
               TUTORIAL COMPLETE
@@ -242,7 +250,7 @@ export default function HowToPlay() {
               style={{
                 fontFamily: fonts.clashSemibold,
                 fontSize: s(28),
-                letterSpacing: -0.3,
+                letterSpacing: 0,
                 color: colors.ink,
               }}>
               You beat Pebble!

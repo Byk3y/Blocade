@@ -45,7 +45,7 @@ export function StatStrip({
               style={{
                 fontFamily: fonts.satoshiBold,
                 fontSize: s(9.5),
-                letterSpacing: 1.5,
+                letterSpacing: 0,
                 color: colors.label,
               }}>
               {st.label}

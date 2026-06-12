@@ -3,7 +3,7 @@ import { Pressable, View, StyleProp, ViewStyle, LayoutChangeEvent } from 'react-
 import { Grad } from './Grad';
 import { Piece } from './Piece';
 import { colors, radii, s, gradients, shadows } from '../constants/theme';
-import { Cell } from '../constants/game-data';
+import { Cell, PieceColor } from '../constants/game-data';
 
 export type BlockSpec = {
   /** design-pixel rect in board-grid coordinates */
@@ -12,8 +12,33 @@ export type BlockSpec = {
   w: number;
   h: number;
   variant: 'ink' | 'ghost' | 'ghost-bad' | 'floating';
+  ownerColor?: PieceColor;
   rotate?: number;
 };
+
+const blockColors = {
+  blue: gradients.blockBlue,
+  green: gradients.blockGreen,
+  orange: gradients.blockOrange,
+} as const;
+
+const blockChrome = {
+  blue: {
+    borderColor: 'rgba(34,67,168,0.75)',
+    borderTopColor: 'rgba(173,194,255,0.95)',
+    shadowColor: '#2f5fe0',
+  },
+  green: {
+    borderColor: 'rgba(81,127,52,0.75)',
+    borderTopColor: 'rgba(213,242,157,0.95)',
+    shadowColor: '#78ad4e',
+  },
+  orange: {
+    borderColor: 'rgba(181,70,7,0.75)',
+    borderTopColor: 'rgba(255,186,137,0.95)',
+    shadowColor: '#e8590c',
+  },
+} as const;
 
 /** Window-space frame of the inner cell grid (top-left of cell 0,0). */
 export type GridFrame = { x: number; y: number };
@@ -165,14 +190,31 @@ export function Board({
               />
             );
           }
+          const ownerChrome = b.variant === 'ink' && b.ownerColor ? blockChrome[b.ownerColor] : null;
+          const blockShadow = ownerChrome
+            ? {
+                ...shadows.placedBlock,
+                shadowColor: ownerChrome.shadowColor,
+                shadowOpacity: 0.46,
+                shadowRadius: 11,
+                elevation: 7,
+              }
+            : shadows.placedBlock;
           return (
             <Grad
               key={i}
-              colors={gradients.blockInk}
+              colors={b.variant === 'ink' && b.ownerColor ? blockColors[b.ownerColor] : gradients.blockInk}
               angle={180}
               pointerEvents="none"
               style={{
                 ...common,
+                ...(ownerChrome
+                  ? {
+                      borderWidth: 1,
+                      borderColor: ownerChrome.borderColor,
+                      borderTopColor: ownerChrome.borderTopColor,
+                    }
+                  : null),
                 transform: b.rotate ? [{ rotate: `${b.rotate}deg` }] : undefined,
                 ...(b.variant === 'floating'
                   ? {
@@ -182,7 +224,7 @@ export function Board({
                       shadowOffset: { width: 0, height: 14 },
                       elevation: 12,
                     }
-                  : shadows.placedBlock),
+                  : blockShadow),
               }}
             />
           );

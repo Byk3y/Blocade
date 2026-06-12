@@ -10,7 +10,7 @@ export const P = 40; // cell pitch (34 cell + 6 gap)
 export const C = 34; // cell size
 
 export type EyeStyle = 'round' | 'mid' | 'slit';
-export type PieceColor = 'blue' | 'orange';
+export type PieceColor = 'blue' | 'green' | 'orange';
 
 export interface Cell {
   bg: string;

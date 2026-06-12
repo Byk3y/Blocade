@@ -28,13 +28,14 @@ function makeState(over: {
   walls1?: number;
 }): GameState {
   const g = createGame();
+  const walls = over.walls?.map((w) => ({ ...w, owner: over.turn ?? 0 })) ?? [];
   return {
     ...g,
     players: [
       { pos: over.p0 ?? g.players[0].pos, wallsLeft: over.walls0 ?? 10 },
       { pos: over.p1 ?? g.players[1].pos, wallsLeft: over.walls1 ?? 10 },
     ],
-    walls: over.walls ?? [],
+    walls,
     turn: over.turn ?? 0,
   };
 }
@@ -217,6 +218,18 @@ describe('walls', () => {
     const res = applyAction(g, { type: 'wall', wall: { r: 0, c: 3, o: 'h' } });
     assert.ok(res.ok);
     if (res.ok) assert.ok((res.oppPathDelta ?? 0) >= 1, 'blocking the spawn column adds distance');
+  });
+
+  it('stores the player who placed each wall', () => {
+    const first = applyAction(createGame(), { type: 'wall', wall: { r: 0, c: 3, o: 'h' } });
+    assert.ok(first.ok);
+    if (!first.ok) return;
+    assert.equal(first.state.walls[0].owner, 0);
+
+    const second = applyAction(first.state, { type: 'wall', wall: { r: 6, c: 3, o: 'h' } });
+    assert.ok(second.ok);
+    if (!second.ok) return;
+    assert.equal(second.state.walls[1].owner, 1);
   });
 });
 

@@ -8,7 +8,7 @@ import { PlayerCard } from '@/components/PlayerCard';
 import { IconCircle } from '@/components/Buttons';
 import { Grad } from '@/components/Grad';
 import { colors, fonts, gradients, s } from '@/constants/theme';
-import { Cell, P, botByName, makeTicks, wallRect } from '@/constants/game-data';
+import { Cell, P, PieceColor, botByName, makeTicks, wallRect } from '@/constants/game-data';
 import { GameState, Orientation, Pos, Wall, canPlaceWall, samePos } from '@/engine';
 import { useGame } from '@/hooks/use-game';
 import { setLastMatch } from '@/state/match-store';
@@ -20,17 +20,24 @@ export default function Game() {
     mode?: string;
     bot?: string;
     difficulty?: string;
+    playerColor?: string;
     nonce?: string;
   }>();
   const mode = params.mode === 'local' ? 'local' : 'bot';
   const botName = mode === 'bot' ? (params.bot ?? 'Riko-9') : undefined;
+  const playerColor: PieceColor | undefined =
+    params.playerColor === 'green' || params.playerColor === 'orange' ? params.playerColor : undefined;
+  const yourPieceColor = playerColor ?? 'blue';
+  const rivalPieceColor: PieceColor = mode === 'bot' && yourPieceColor === 'orange' ? 'green' : 'orange';
   // key remounts the whole match on rematch (fresh nonce) or rival change
   return (
     <Match
-      key={`${mode}-${botName ?? 'local'}-${params.nonce ?? '0'}`}
+      key={`${mode}-${botName ?? 'local'}-${playerColor ?? 'blue'}-${params.nonce ?? '0'}`}
       mode={mode}
       botName={botName}
       difficulty={params.difficulty}
+      playerColor={yourPieceColor}
+      rivalColor={rivalPieceColor}
     />
   );
 }
@@ -39,10 +46,14 @@ function Match({
   mode,
   botName,
   difficulty,
+  playerColor,
+  rivalColor,
 }: {
   mode: 'bot' | 'local';
   botName?: string;
   difficulty?: string;
+  playerColor: PieceColor;
+  rivalColor: PieceColor;
 }) {
   const router = useRouter();
   const bot = botByName(botName);
@@ -53,6 +64,8 @@ function Match({
         mode,
         botName,
         difficulty,
+        playerColor,
+        rivalColor,
         winner: final.winner!,
         finalState: final,
       });
@@ -63,7 +76,7 @@ function Match({
         params: { outcome, mode, bot: botName ?? '', difficulty: difficulty ?? '' },
       });
     },
-    [mode, botName, difficulty, router],
+    [mode, botName, difficulty, playerColor, rivalColor, router],
   );
 
   const game = useGame({ mode, bot, difficulty, onGameOver });
@@ -159,16 +172,31 @@ function Match({
     responders.current = { h: makeResponder('h'), v: makeResponder('v') };
   }
 
-  const turnColor = state.turn === 0 ? 'blue' : 'orange';
+  const yourPieceColor = playerColor;
+  const rivalPieceColor = rivalColor;
+  const colorValue = (color: PieceColor) =>
+    color === 'green' ? colors.playerGreen : color === 'blue' ? colors.blue : colors.rivalOrange;
+  const activeBlockColor: PieceColor = mode === 'local' && state.turn === 1 ? rivalPieceColor : yourPieceColor;
+  const blockGradient =
+    activeBlockColor === 'green'
+      ? gradients.blockGreen
+      : activeBlockColor === 'orange'
+        ? gradients.blockOrange
+        : gradients.blockBlue;
+  const turnColor = state.turn === 0 ? yourPieceColor : rivalPieceColor;
   const showDots = humanTurn && ui.kind === 'move' && state.winner === null && !drag;
 
   const cells = useMemo(
-    () => buildCells(state, showDots ? legalTargets : []),
-    [state, showDots, legalTargets],
+    () => buildCells(state, showDots ? legalTargets : [], yourPieceColor, rivalPieceColor),
+    [state, showDots, legalTargets, yourPieceColor, rivalPieceColor],
   );
 
   const blocks = useMemo<BlockSpec[]>(() => {
-    const placed: BlockSpec[] = state.walls.map((w) => ({ ...wallRect(w), variant: 'ink' }));
+    const placed: BlockSpec[] = state.walls.map((w) => ({
+      ...wallRect(w),
+      variant: 'ink',
+      ownerColor: w.owner === 0 ? yourPieceColor : rivalPieceColor,
+    }));
     // live drag snap preview (green/neutral when legal, orange when not)
     if (drag && drag.wall.r >= 0) {
       placed.push({ ...wallRect(drag.wall), variant: drag.valid ? 'ghost' : 'ghost-bad' });
@@ -285,15 +313,15 @@ function Match({
         </IconCircle>
         <Text
           style={{
-            fontFamily: fonts.clashSemibold,
-            fontSize: s(17),
-            letterSpacing: 1.5,
+            fontFamily: fonts.satoshiBlack,
+            fontSize: s(13.5),
+            letterSpacing: 0,
             color: colors.ink,
           }}>
           BLOCADE
         </Text>
         <IconCircle onPress={() => router.navigate('/how-to-play')}>
-          <Text style={{ fontSize: s(17), color: colors.inkSoft, letterSpacing: 1 }}>⋯</Text>
+          <Text style={{ fontSize: s(17), color: colors.inkSoft }}>⋯</Text>
         </IconCircle>
       </View>
 
@@ -318,7 +346,7 @@ function Match({
         <Board
           cells={cells}
           blocks={blocks}
-          dotColor={turnColor === 'blue' ? colors.blue : colors.rivalOrange}
+          dotColor={colorValue(turnColor)}
           onCellPress={game.tapCell}
           onMeasureGrid={(f) => (gridFrame.current = f)}
           overlay={slotOverlay}
@@ -326,7 +354,8 @@ function Match({
         <BlockTray
           remaining={state.players[mode === 'local' ? state.turn : 0].wallsLeft}
           active={drag ? drag.o : ui.kind === 'wall' ? ui.o : null}
-          accent={mode === 'local' && state.turn === 1 ? colors.rivalOrange : colors.blue}
+          accent={mode === 'local' && state.turn === 1 ? colors.rivalOrange : colorValue(yourPieceColor)}
+          blockColor={activeBlockColor}
           hint={
             drag
               ? 'Drop it on a lane between tiles'
@@ -350,9 +379,10 @@ function Match({
           rating={mode === 'bot' ? 1210 : 0}
           subline={yourSubline}
           avatar={gradients.blueAvatar}
+          accent={yourPieceColor}
           active={state.turn === 0 && state.winner === null}
           chip={state.turn === 0 && state.winner === null ? 'YOUR MOVE' : undefined}
-          ticks={makeTicks(state.players[0].wallsLeft, colors.blue)}
+          ticks={makeTicks(state.players[0].wallsLeft, colorValue(yourPieceColor))}
         />
       </View>
 
@@ -371,15 +401,18 @@ function Match({
             ],
           }}>
           <Grad
-            colors={gradients.blockInk}
+            colors={blockGradient}
             angle={drag.o === 'h' ? 180 : 90}
             style={{
               width: drag.o === 'h' ? s(74) : s(12),
               height: drag.o === 'h' ? s(12) : s(74),
               borderRadius: s(6),
               opacity: 0.96,
-              shadowColor: '#22262e',
-              shadowOpacity: 0.45,
+              borderWidth: 1,
+              borderColor: colorValue(activeBlockColor),
+              borderTopColor: 'rgba(255,255,255,0.58)',
+              shadowColor: colorValue(activeBlockColor),
+              shadowOpacity: 0.48,
               shadowRadius: 22,
               shadowOffset: { width: 0, height: 14 },
               elevation: 14,
@@ -392,7 +425,12 @@ function Match({
 }
 
 /** Project engine state onto the design's cell model. */
-function buildCells(state: GameState, dots: Pos[]): Cell[] {
+function buildCells(
+  state: GameState,
+  dots: Pos[],
+  playerOneColor: PieceColor = 'blue',
+  playerTwoColor: PieceColor = 'orange',
+): Cell[] {
   const cells: Cell[] = [];
   const p0 = state.players[0].pos;
   const p1 = state.players[1].pos;
@@ -405,7 +443,7 @@ function buildCells(state: GameState, dots: Pos[]): Cell[] {
       cells.push({
         bg,
         dot: dots.some((d) => samePos(d, here)),
-        piece: samePos(p0, here) ? 'blue' : samePos(p1, here) ? 'orange' : null,
+        piece: samePos(p0, here) ? playerOneColor : samePos(p1, here) ? playerTwoColor : null,
       });
     }
   }

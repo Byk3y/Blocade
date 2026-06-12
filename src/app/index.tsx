@@ -52,7 +52,7 @@ export default function Home() {
           </Text>
         </View>
         <IconCircle size={40}>
-          <Text style={{ fontSize: s(16), color: colors.inkSoft, letterSpacing: 1 }}>⋯</Text>
+          <Text style={{ fontSize: s(16), color: colors.inkSoft }}>⋯</Text>
         </IconCircle>
       </View>
 
@@ -71,7 +71,7 @@ export default function Home() {
             style={{
               fontFamily: fonts.clashSemibold,
               fontSize: s(44),
-              letterSpacing: 0.5,
+              letterSpacing: 0,
               lineHeight: s(44),
               color: colors.ink,
             }}>
@@ -81,7 +81,7 @@ export default function Home() {
             style={{
               fontFamily: fonts.satoshiMedium,
               fontSize: s(14),
-              letterSpacing: 0.3,
+              letterSpacing: 0,
               color: colors.textSecondary,
             }}>
             Race across. Block everything.
@@ -224,7 +224,7 @@ function SoonChip({ label }: { label: string }) {
           style={{
             fontFamily: fonts.satoshiBold,
             fontSize: s(8.5),
-            letterSpacing: 1,
+            letterSpacing: 0,
             color: colors.textMuted,
           }}>
           SOON

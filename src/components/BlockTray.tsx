@@ -1,6 +1,13 @@
 import { GestureResponderHandlers, Text, View } from 'react-native';
 import { Grad } from './Grad';
 import { colors, fonts, radii, s, gradients, shadows } from '../constants/theme';
+import { PieceColor } from '../constants/game-data';
+
+const blockColors = {
+  blue: gradients.blockBlue,
+  green: gradients.blockGreen,
+  orange: gradients.blockOrange,
+} as const;
 
 /**
  * The block tray directly under the board: a label + two wells (horizontal and
@@ -13,6 +20,7 @@ export function BlockTray({
   active = null,
   hint,
   accent = colors.blue,
+  blockColor = 'blue',
   panHandlersFor,
 }: {
   remaining: number;
@@ -20,10 +28,13 @@ export function BlockTray({
   hint: string;
   /** selection colour — blue for you, orange for player 2 in pass & play */
   accent?: string;
+  /** visible roadblock colour in the tray wells */
+  blockColor?: PieceColor;
   /** tap/drag handlers for each well */
   panHandlersFor?: (o: 'h' | 'v') => GestureResponderHandlers | undefined;
 }) {
   const empty = remaining <= 0;
+  const blockGradient = blockColors[blockColor];
   return (
     <View
       style={{
@@ -44,7 +55,7 @@ export function BlockTray({
           style={{
             fontFamily: fonts.satoshiBold,
             fontSize: s(9.5),
-            letterSpacing: 1.5,
+            letterSpacing: 0,
             color: colors.label,
           }}>
           {empty ? 'NO BLOCKS LEFT' : `BLOCKS · ${remaining} LEFT`}
@@ -57,13 +68,21 @@ export function BlockTray({
       {/* horizontal well */}
       <Well active={active === 'h'} accent={accent} dim={empty} panHandlers={panHandlersFor?.('h')}>
         <Grad
-          colors={gradients.trayBlockUnder}
+          colors={blockGradient}
           angle={180}
           pointerEvents="none"
-          style={{ position: 'absolute', left: s(13), top: s(34), width: s(54), height: s(10), borderRadius: s(5) }}
+          style={{
+            position: 'absolute',
+            left: s(13),
+            top: s(35),
+            width: s(54),
+            height: s(9),
+            borderRadius: s(5),
+            opacity: 0.62,
+          }}
         />
         <Grad
-          colors={gradients.trayBlock}
+          colors={blockGradient}
           angle={180}
           pointerEvents="none"
           style={{
@@ -73,8 +92,11 @@ export function BlockTray({
             width: s(60),
             height: s(11),
             borderRadius: s(6),
-            shadowColor: '#22262e',
-            shadowOpacity: 0.35,
+            borderWidth: 1,
+            borderColor: accent,
+            borderTopColor: 'rgba(255,255,255,0.55)',
+            shadowColor: accent,
+            shadowOpacity: 0.38,
             shadowRadius: 14,
             shadowOffset: { width: 0, height: 8 },
             elevation: 6,
@@ -85,13 +107,21 @@ export function BlockTray({
       {/* vertical well */}
       <Well active={active === 'v'} accent={accent} dim={empty} panHandlers={panHandlersFor?.('v')}>
         <Grad
-          colors={gradients.trayBlockUnder}
+          colors={blockGradient}
           angle={90}
           pointerEvents="none"
-          style={{ position: 'absolute', left: s(42), top: s(7), width: s(10), height: s(48), borderRadius: s(5) }}
+          style={{
+            position: 'absolute',
+            left: s(42),
+            top: s(7),
+            width: s(9),
+            height: s(48),
+            borderRadius: s(5),
+            opacity: 0.62,
+          }}
         />
         <Grad
-          colors={gradients.trayBlock}
+          colors={blockGradient}
           angle={90}
           pointerEvents="none"
           style={{
@@ -101,8 +131,11 @@ export function BlockTray({
             width: s(11),
             height: s(52),
             borderRadius: s(6),
-            shadowColor: '#22262e',
-            shadowOpacity: 0.35,
+            borderWidth: 1,
+            borderColor: accent,
+            borderTopColor: 'rgba(255,255,255,0.55)',
+            shadowColor: accent,
+            shadowOpacity: 0.38,
             shadowRadius: 14,
             shadowOffset: { width: 0, height: 8 },
             elevation: 6,
