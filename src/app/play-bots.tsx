@@ -10,6 +10,7 @@ import { Grad } from '@/components/Grad';
 import { Piece } from '@/components/Piece';
 import { colors, fonts, s, shadows } from '@/constants/theme';
 import { roster, featuredBot, Bot } from '@/constants/game-data';
+import { botPortraits } from '@/constants/bot-portraits';
 
 const DIFFICULTIES = ['Friendly', 'Intermediate', 'Advanced'] as const;
 type PlayerChoice = 'green' | 'orange';
@@ -139,6 +140,7 @@ function BotTile({ bot, selected, onPress }: { bot: Bot; selected: boolean; onPr
         eyes={bot.eyes}
         mouth={bot.eyes === 'round' ? 'smile' : 'flat'}
         crown={false}
+        portrait={bot.portrait ? botPortraits[bot.portrait] : undefined}
         style={{ marginBottom: selected ? s(1) : s(3) }}
       />
       {crowns === 1 && <Crown />}

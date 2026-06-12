@@ -15,8 +15,14 @@ import { pieceGradient } from '@/constants/theme';
 
 export default function Home() {
   const router = useRouter();
-  const { loading } = useAuth();
+  const { loading, profile } = useAuth();
   const checkedFirstLaunch = useRef(false);
+
+  // Live profile with sensible defaults while it loads / when offline.
+  const username = profile?.username ?? 'Player';
+  const rating = profile?.rating ?? 1000;
+  const wins = profile?.wins ?? 0;
+  const streak = profile?.streak ?? 0;
 
   // First launch: once the app has settled (silent anon sign-in done), present
   // the guided first match over Home. Runs at most once per app session.
@@ -45,13 +51,17 @@ export default function Home() {
         }}>
         <Mascot size={s(44)} radius={s(15)} gradient={gradients.blueAvatar} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ fontFamily: fonts.satoshiBold, fontSize: s(15), color: colors.ink }}>Sam</Text>
+          <Text
+            numberOfLines={1}
+            style={{ fontFamily: fonts.satoshiBold, fontSize: s(15), color: colors.ink }}>
+            {username}
+          </Text>
           <Text
             style={{ fontFamily: fonts.satoshi, fontSize: s(12), color: colors.textMuted, marginTop: 1 }}>
-            Rating 1210
+            Rating {rating}
           </Text>
         </View>
-        <IconCircle size={40}>
+        <IconCircle size={40} onPress={() => router.navigate('/settings')}>
           <Text style={{ fontSize: s(16), color: colors.inkSoft }}>⋯</Text>
         </IconCircle>
       </View>
@@ -89,9 +99,9 @@ export default function Home() {
         </View>
         <StatStrip
           stats={[
-            { value: '24', label: 'WINS' },
-            { value: '3', label: 'STREAK' },
-            { value: '1210', label: 'RATING' },
+            { value: String(wins), label: 'WINS' },
+            { value: String(streak), label: 'STREAK' },
+            { value: String(rating), label: 'RATING' },
           ]}
         />
       </View>

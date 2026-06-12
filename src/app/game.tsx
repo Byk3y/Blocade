@@ -1,14 +1,17 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, View, Text, Pressable } from 'react-native';
+import { useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Board, BlockSpec, GridFrame } from '@/components/Board';
+import { useSettings } from '@/state/settings';
 import { BlockTray } from '@/components/BlockTray';
 import { PlayerCard } from '@/components/PlayerCard';
 import { IconCircle } from '@/components/Buttons';
 import { Grad } from '@/components/Grad';
 import { colors, fonts, gradients, s } from '@/constants/theme';
 import { Cell, P, PieceColor, botByName, makeTicks, wallRect } from '@/constants/game-data';
+import { botPortraits } from '@/constants/bot-portraits';
 import { GameState, Orientation, Pos, Wall, canPlaceWall, samePos } from '@/engine';
 import { useGame } from '@/hooks/use-game';
 import { setLastMatch } from '@/state/match-store';
@@ -150,10 +153,10 @@ function Match({
             live.current.game.pickWall(o); // it was a tap → arm tap-to-place
           } else {
             const wall = snapWall(g.moveX, g.moveY - dragLift, o);
-            if (wall) {
-              const ok = live.current.game.placeWall(wall);
-              if (!ok) live.current.game.say('Can’t place a roadblock there', 'bad');
-            }
+            // placeWall already surfaces the specific rejection reason
+            // (e.g. "That roadblock blocks every route") via doAction, so we
+            // must not overwrite it here with a generic message.
+            if (wall) live.current.game.placeWall(wall);
           }
           dragging = false;
           setDrag(null);
@@ -171,6 +174,25 @@ function Match({
   if (!responders.current) {
     responders.current = { h: makeResponder('h'), v: makeResponder('v') };
   }
+
+  // ---- game feel -----------------------------------------------------------
+  const { reduceMotion } = useSettings();
+  // a ~1px board "settle" when any wall lands (human or bot)
+  const settle = useSharedValue(0);
+  const prevWallCount = useRef(state.walls.length);
+  useEffect(() => {
+    const count = state.walls.length;
+    if (count > prevWallCount.current && !reduceMotion) {
+      // press DOWN under the wall's weight, then a smaller rebound up to rest —
+      // asymmetric recoil reads heavier than a symmetric bounce
+      settle.value = withSequence(
+        withTiming(s(1.2), { duration: 55 }),
+        withTiming(-s(0.6), { duration: 45 }),
+        withSpring(0, { damping: 13, stiffness: 380 }),
+      );
+    }
+    prevWallCount.current = count;
+  }, [state.walls.length, reduceMotion, settle]);
 
   const yourPieceColor = playerColor;
   const rivalPieceColor = rivalColor;
@@ -196,6 +218,8 @@ function Match({
       ...wallRect(w),
       variant: 'ink',
       ownerColor: w.owner === 0 ? yourPieceColor : rivalPieceColor,
+      // stable identity so only a newly-placed wall mounts → drop-animates
+      key: `${w.o}${w.r}-${w.c}`,
     }));
     // live drag snap preview (green/neutral when legal, orange when not)
     if (drag && drag.wall.r >= 0) {
@@ -275,6 +299,7 @@ function Match({
           subline: state.turn === 1 && state.winner === null ? 'Your move — pass the phone' : 'Racing to the bottom row',
           avatar: gradients.orangeAvatar,
           eyes: 'round' as const,
+          portrait: undefined,
         }
       : {
           name: bot?.name ?? 'Rival',
@@ -287,6 +312,7 @@ function Match({
                 : (bot?.styleLine ?? 'Ready'),
           avatar: (bot?.avatar ?? gradients.orangeAvatar) as readonly [string, string],
           eyes: bot?.eyes ?? ('round' as const),
+          portrait: bot?.portrait ? botPortraits[bot.portrait] : undefined,
         };
 
   const yourName = mode === 'local' ? 'Player 1' : 'You';
@@ -332,6 +358,7 @@ function Match({
           rating={oppCard.rating ?? 0}
           subline={oppCard.subline}
           avatar={oppCard.avatar}
+          portrait={oppCard.portrait}
           eyes={oppCard.eyes}
           mouth="flat"
           accent="orange"
@@ -350,6 +377,14 @@ function Match({
           onCellPress={game.tapCell}
           onMeasureGrid={(f) => (gridFrame.current = f)}
           overlay={slotOverlay}
+          animatePieces
+          pieces={[
+            { pos: state.players[0].pos, color: yourPieceColor },
+            { pos: state.players[1].pos, color: rivalPieceColor },
+          ]}
+          animateBlocks={!reduceMotion}
+          settle={settle}
+          reduceMotion={reduceMotion}
         />
         <BlockTray
           remaining={state.players[mode === 'local' ? state.turn : 0].wallsLeft}

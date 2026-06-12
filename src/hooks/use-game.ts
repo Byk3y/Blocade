@@ -14,6 +14,7 @@ import {
   samePos,
 } from '../engine';
 import { Bot, difficultyBlunderScale } from '../constants/game-data';
+import { feel } from '../lib/feel';
 
 export type WallUI =
   | { kind: 'move' }
@@ -109,8 +110,11 @@ export function useGame({
       if (res.ok) {
         setState(res.state);
         if (action.type === 'wall') {
+          feel('wallPlaced');
           const f = botWallText(bot.name, res.oppPathDelta ?? 0);
           say(f.text, f.tone);
+        } else if (res.state.winner === null) {
+          feel('move');
         }
       }
     }, delay);
@@ -124,12 +128,15 @@ export function useGame({
   useEffect(() => {
     if (state.winner === null || overFired.current) return;
     overFired.current = true;
-    // a beat to see the winning move land before the sheet slides up
+    // vs a bot, the human is player 0 — a player-1 win is YOUR loss.
+    // pass-and-play has no "loss": someone always wins, so play the win cue.
+    feel(mode === 'bot' && state.winner === 1 ? 'loss' : 'win');
+    // a beat to see the winning move land before the sheet slides up.
+    // No cleanup return here on purpose: this effect re-runs on every state
+    // change, and a per-run cleanup would clear this timer on the next commit.
+    // The overFired ref makes it fire once; the unmount effect below clears it.
     overTimer.current = setTimeout(() => onGameOver(state), 900);
-    return () => {
-      if (overTimer.current) clearTimeout(overTimer.current);
-    };
-  }, [state, onGameOver]);
+  }, [state, onGameOver, mode]);
 
   useEffect(
     () => () => {
@@ -145,13 +152,18 @@ export function useGame({
     (action: Action): boolean => {
       const res = applyAction(state, action);
       if (!res.ok) {
+        if (action.type === 'wall') feel('wallIllegal');
         say(REJECT_TEXT[res.reason], 'bad');
         return false;
       }
       setState(res.state);
       if (action.type === 'wall') {
+        feel('wallPlaced');
         const f = placedWallText(res.oppPathDelta ?? 0);
         say(f.text, f.tone);
+      } else if (res.state.winner === null) {
+        // a move that wins is carried by feel('win') alone — no double-buzz
+        feel('move');
       }
       return true;
     },

@@ -3,6 +3,7 @@ import { Mascot } from './Mascot';
 import { Ticks } from './Ticks';
 import { colors, fonts, radii, s, shadows } from '../constants/theme';
 import { EyeStyle } from '../constants/game-data';
+import { botPortraits, type BotPortraitKey } from '../constants/bot-portraits';
 
 /** A player status card (used for both you and the rival on the Game screen). */
 export function PlayerCard({
@@ -10,6 +11,7 @@ export function PlayerCard({
   rating,
   subline,
   avatar,
+  portrait,
   eyes = 'round',
   mouth = 'smile',
   active = false,
@@ -21,6 +23,7 @@ export function PlayerCard({
   rating: number;
   subline: string;
   avatar: readonly [string, string, ...string[]];
+  portrait?: BotPortraitKey;
   eyes?: EyeStyle;
   mouth?: 'smile' | 'flat';
   active?: boolean;
@@ -55,7 +58,14 @@ export function PlayerCard({
         paddingHorizontal: s(14),
         ...(active ? activeShadow : shadows.card),
       }}>
-      <Mascot size={s(42)} radius={s(14)} gradient={avatar} eyes={eyes} mouth={mouth} />
+      <Mascot
+        size={s(42)}
+        radius={s(14)}
+        gradient={avatar}
+        eyes={eyes}
+        mouth={mouth}
+        portrait={portrait ? botPortraits[portrait] : undefined}
+      />
 
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8) }}>

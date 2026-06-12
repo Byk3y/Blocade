@@ -2,6 +2,7 @@ import { View, Text, Pressable } from 'react-native';
 import { Mascot } from './Mascot';
 import { colors, fonts, radii, s } from '../constants/theme';
 import { Bot } from '../constants/game-data';
+import { botPortraits } from '../constants/bot-portraits';
 
 /** A roster bot card with open / selected / beaten / locked states. */
 export function BotCard({ bot, onPress }: { bot: Bot; onPress?: () => void }) {
@@ -49,6 +50,7 @@ export function BotCard({ bot, onPress }: { bot: Bot; onPress?: () => void }) {
           eyes={bot.eyes}
           mouth={bot.eyes === 'round' ? 'smile' : 'flat'}
           crown={bot.crown}
+          portrait={bot.portrait ? botPortraits[bot.portrait] : undefined}
         />
         <Text style={{ fontFamily: fonts.satoshiBold, fontSize: s(11.5), lineHeight: s(12), color: colors.ink }}>
           {bot.name}

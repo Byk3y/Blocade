@@ -1,5 +1,6 @@
 import { colors } from './theme';
 import type { BotSkill, BotStyle } from '../engine/bots';
+import type { BotPortraitKey } from './bot-portraits';
 
 /**
  * Board / roster data — a faithful port of the `Component` class at the bottom of
@@ -121,6 +122,7 @@ export interface Bot {
   name: string;
   rating: number;
   avatar: [string, string]; // gradient stops
+  portrait?: BotPortraitKey;
   eyes: EyeStyle;
   state: BotState;
   crown?: boolean;
@@ -140,10 +142,10 @@ export const roster: { title: string; tally: string; beaten: number; bots: Bot[]
     tally: '3/4 BEATEN',
     beaten: 3,
     bots: [
-      { name: 'Pebble', rating: 320, avatar: ['#8fbf7e', '#557d47'], eyes: 'round', state: 'beaten', style: 'random', blunder: 0.8, taunt: '“Which way is forward again?”', styleLine: 'Wanders happily' },
-      { name: 'Momo', rating: 460, avatar: ['#e6b54e', '#a87a1e'], eyes: 'round', state: 'beaten', style: 'random', blunder: 0.55, taunt: '“I block… vibes, mostly.”', styleLine: 'Unpredictable' },
-      { name: 'Tuk', rating: 640, avatar: ['#62b5a4', '#2f7a6a'], eyes: 'round', state: 'beaten', style: 'runner', blunder: 0.38, taunt: '“Catch me if you can.”', styleLine: 'Runs, never blocks' },
-      { name: 'Juno', rating: 820, avatar: ['#d98a9c', '#a04a60'], eyes: 'round', state: 'open', style: 'runner', blunder: 0.24, taunt: '“Shortest path. Every time.”', styleLine: 'Pure racer' },
+      { name: 'Pebble', portrait: 'pebble', rating: 320, avatar: ['#8fbf7e', '#557d47'], eyes: 'round', state: 'beaten', style: 'random', blunder: 0.8, taunt: '“Which way is forward again?”', styleLine: 'Wanders happily' },
+      { name: 'Momo', portrait: 'momo', rating: 460, avatar: ['#e6b54e', '#a87a1e'], eyes: 'round', state: 'beaten', style: 'random', blunder: 0.55, taunt: '“I block… vibes, mostly.”', styleLine: 'Unpredictable' },
+      { name: 'Tuk', portrait: 'tuk', rating: 640, avatar: ['#62b5a4', '#2f7a6a'], eyes: 'round', state: 'beaten', style: 'runner', blunder: 0.38, taunt: '“Catch me if you can.”', styleLine: 'Runs, never blocks' },
+      { name: 'Juno', portrait: 'juno', rating: 820, avatar: ['#d98a9c', '#a04a60'], eyes: 'round', state: 'open', style: 'runner', blunder: 0.24, taunt: '“Shortest path. Every time.”', styleLine: 'Pure racer' },
     ],
   },
   {
@@ -151,10 +153,10 @@ export const roster: { title: string; tally: string; beaten: number; bots: Bot[]
     tally: '0/4 BEATEN',
     beaten: 0,
     bots: [
-      { name: 'Riko-9', rating: 1140, avatar: ['#ff8a4d', '#cf520c'], eyes: 'round', state: 'selected', style: 'balanced', blunder: 0.15, taunt: '“I never take the long way.”', styleLine: 'Runs ahead, blocks behind' },
-      { name: 'Mads', rating: 1320, avatar: ['#5e8fd6', '#2b4f96'], eyes: 'mid', state: 'open', style: 'blocker', blunder: 0.13, taunt: '“Hope you like detours.”', styleLine: 'Wall-happy menace' },
-      { name: 'Echo', rating: 1500, avatar: ['#7fa8b8', '#43687a'], eyes: 'mid', state: 'open', style: 'balanced', blunder: 0.055, taunt: '“I mirror your every plan.”', styleLine: 'Adapts to you' },
-      { name: 'Sable', rating: 1700, avatar: ['#8c8678', '#56523f'], eyes: 'mid', state: 'open', style: 'blocker', blunder: 0.04, taunt: '“The walls have opinions.”', styleLine: 'Defensive wall expert' },
+      { name: 'Riko-9', portrait: 'riko9', rating: 1140, avatar: ['#ff8a4d', '#cf520c'], eyes: 'round', state: 'selected', style: 'balanced', blunder: 0.15, taunt: '“I never take the long way.”', styleLine: 'Runs ahead, blocks behind' },
+      { name: 'Mads', portrait: 'mads', rating: 1320, avatar: ['#5e8fd6', '#2b4f96'], eyes: 'mid', state: 'open', style: 'blocker', blunder: 0.13, taunt: '“Hope you like detours.”', styleLine: 'Wall-happy menace' },
+      { name: 'Echo', portrait: 'echo', rating: 1500, avatar: ['#7fa8b8', '#43687a'], eyes: 'mid', state: 'open', style: 'balanced', blunder: 0.055, taunt: '“I mirror your every plan.”', styleLine: 'Adapts to you' },
+      { name: 'Sable', portrait: 'sable', rating: 1700, avatar: ['#8c8678', '#56523f'], eyes: 'mid', state: 'open', style: 'blocker', blunder: 0.04, taunt: '“The walls have opinions.”', styleLine: 'Defensive wall expert' },
     ],
   },
   {
@@ -162,10 +164,10 @@ export const roster: { title: string; tally: string; beaten: number; bots: Bot[]
     tally: '0/4 BEATEN',
     beaten: 0,
     bots: [
-      { name: 'Vex', rating: 2010, avatar: ['#9a74d4', '#5c3a92'], eyes: 'slit', state: 'open', style: 'strategic', blunder: 0.09, taunt: '“Route advantage: mine.”', styleLine: 'Thinks a move ahead' },
-      { name: 'Onyx', rating: 2180, avatar: ['#6a7180', '#3a404c'], eyes: 'slit', state: 'open', style: 'strategic', blunder: 0.05, taunt: '“I saw this game end already.”', styleLine: 'Cold calculator' },
-      { name: 'Nyx', rating: 2300, avatar: ['#b06a9e', '#6e3a62'], eyes: 'slit', state: 'open', style: 'strategic', blunder: 0.025, taunt: '“Every lane you like, I own.”', styleLine: 'Territory tyrant' },
-      { name: 'Warden', rating: 2400, avatar: ['#3a404c', '#15181f'], eyes: 'slit', state: 'open', crown: true, style: 'strategic', blunder: 0.008, taunt: '“No one gets through.”', styleLine: 'The final wall' },
+      { name: 'Vex', portrait: 'vex', rating: 2010, avatar: ['#9a74d4', '#5c3a92'], eyes: 'slit', state: 'open', style: 'strategic', blunder: 0.09, taunt: '“Route advantage: mine.”', styleLine: 'Thinks a move ahead' },
+      { name: 'Onyx', portrait: 'onyx', rating: 2180, avatar: ['#6a7180', '#3a404c'], eyes: 'slit', state: 'open', style: 'strategic', blunder: 0.05, taunt: '“I saw this game end already.”', styleLine: 'Cold calculator' },
+      { name: 'Nyx', portrait: 'nyx', rating: 2300, avatar: ['#b06a9e', '#6e3a62'], eyes: 'slit', state: 'open', style: 'strategic', blunder: 0.025, taunt: '“Every lane you like, I own.”', styleLine: 'Territory tyrant' },
+      { name: 'Warden', portrait: 'warden', rating: 2400, avatar: ['#3a404c', '#15181f'], eyes: 'slit', state: 'open', crown: true, style: 'strategic', blunder: 0.008, taunt: '“No one gets through.”', styleLine: 'The final wall' },
     ],
   },
 ];

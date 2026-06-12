@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { View, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,8 +9,11 @@ import { StatStrip } from '@/components/StatStrip';
 import { PrimaryButton, SecondaryButton, TextButton } from '@/components/Buttons';
 import { colors, fonts, gradients, s } from '@/constants/theme';
 import { Cell, PieceColor, board, botByName, wallRect, walls as demoWalls } from '@/constants/game-data';
+import { botPortraits } from '@/constants/bot-portraits';
 import { GameState, PlayerId, WALLS_PER_PLAYER, routeDist, samePos } from '@/engine';
-import { getLastMatch } from '@/state/match-store';
+import { getLastMatch, claimRecording } from '@/state/match-store';
+import { useAuth } from '@/state/auth';
+import { ratingDelta, formatDelta } from '@/lib/rating';
 
 /**
  * Match result — a sheet over the dimmed final board.
@@ -34,6 +38,31 @@ export default function Result() {
   const win = winner === 0; // "win" = blue side won
   const bot = botByName(match?.botName ?? params.bot ?? undefined);
   const botName = bot?.name ?? 'Riko-9';
+
+  // ---- cloud progression ---------------------------------------------------
+  const { profile, loading, online, recordResult } = useAuth();
+  // Freeze the player's PRE-match rating once it's known (profile loaded, or
+  // confirmed offline). recordResult updates the profile, so without freezing,
+  // the displayed delta would recompute and shift mid-screen.
+  const baseRating = useRef<number | null>(null);
+  const ready = profile !== null || (!loading && !online);
+  if (baseRating.current === null && ready) baseRating.current = profile?.rating ?? 1000;
+
+  const isBotMatch = !local && !!bot && !!match && match.mode === 'bot';
+  const ratingChange = isBotMatch
+    ? ratingDelta(baseRating.current ?? profile?.rating ?? 1000, bot!.rating, win)
+    : 0;
+
+  // Record this finished bot match to the cloud — exactly once.
+  useEffect(() => {
+    if (!ready || baseRating.current === null) return;
+    if (!isBotMatch || !match) return;
+    if (!claimRecording(match.id)) return;
+    const delta = ratingDelta(baseRating.current, bot!.rating, win);
+    recordResult(win, delta, botName).catch(() => {});
+    // ready/baseRating gate the single fire; claimRecording enforces idempotency
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   // ---- stats from the real final state -------------------------------------
   const finalState = match?.finalState;
@@ -72,17 +101,15 @@ export default function Result() {
           color: win ? colors.blue : colors.rivalOrange,
         },
       ]
-    : win
-      ? [
-          { value: String(turns), label: 'TURNS' },
-          { value: String(blocksUsed), label: 'BLOCKS USED' },
-          { value: `+${margin}`, label: 'ROUTE LEAD', color: colors.blue },
-        ]
-      : [
-          { value: String(turns), label: 'TURNS' },
-          { value: String(blocksUsed), label: 'BLOCKS USED' },
-          { value: '−12', label: 'RATING', color: colors.rivalOrange },
-        ];
+    : [
+        { value: String(turns), label: 'TURNS' },
+        { value: String(blocksUsed), label: 'BLOCKS USED' },
+        {
+          value: formatDelta(ratingChange),
+          label: 'RATING',
+          color: win ? colors.blue : colors.rivalOrange,
+        },
+      ];
 
   const celebrate = local || win;
 
@@ -196,6 +223,7 @@ export default function Result() {
               gradient={avatarGradient}
               eyes={!local && !win ? (bot?.eyes ?? 'round') : 'round'}
               mouth={celebrate ? 'smile' : 'flat'}
+              portrait={bot?.portrait ? botPortraits[bot.portrait] : undefined}
               ring={{
                 shadowColor: win ? colors.blue : '#cf520c',
                 shadowOpacity: win ? 0.35 : 0.3,

@@ -1,4 +1,4 @@
-import { View, StyleProp, ViewStyle } from 'react-native';
+import { Image, StyleSheet, View, StyleProp, ViewStyle, ImageSourcePropType } from 'react-native';
 import { Grad } from './Grad';
 import { colors } from '../constants/theme';
 import { EyeStyle } from '../constants/game-data';
@@ -15,6 +15,7 @@ export function Mascot({
   mouth = 'smile',
   crown = false,
   ring,
+  portrait,
   style,
 }: {
   size: number;
@@ -23,6 +24,7 @@ export function Mascot({
   eyes?: EyeStyle;
   mouth?: 'smile' | 'flat';
   crown?: boolean;
+  portrait?: ImageSourcePropType;
   /** Optional extra shadow / box-shadow style merged onto the tile. */
   ring?: StyleProp<ViewStyle>;
   style?: StyleProp<ViewStyle>;
@@ -43,11 +45,19 @@ export function Mascot({
       <Grad
         colors={gradient}
         angle={160}
-        style={[{ width: size, height: size, borderRadius: radius }, ring]}>
-        {crown && (
-          <View
-            style={{
-              position: 'absolute',
+        style={[{ width: size, height: size, borderRadius: radius, overflow: 'hidden' }, ring]}>
+        {portrait ? (
+          <Image
+            source={portrait}
+            resizeMode="cover"
+            style={[StyleSheet.absoluteFillObject, { width: size, height: size, borderRadius: radius }]}
+          />
+        ) : (
+          <>
+            {crown && (
+            <View
+              style={{
+                position: 'absolute',
               left: size * 0.32,
               top: size * 0.045,
               width: size * 0.36,
@@ -55,44 +65,46 @@ export function Mascot({
               borderRadius: 2,
               backgroundColor: colors.brass,
             }}
-          />
+              />
+            )}
+            <View
+              style={{
+                position: 'absolute',
+                left: leftX,
+                top: eyeY,
+                width: eyeW,
+                height: eyeH,
+                borderRadius: eyes === 'round' ? eyeW : 2,
+                backgroundColor: '#fff',
+              }}
+            />
+            <View
+              style={{
+                position: 'absolute',
+                left: rightX,
+                top: eyeY,
+                width: eyeW,
+                height: eyeH,
+                borderRadius: eyes === 'round' ? eyeW : 2,
+                backgroundColor: '#fff',
+              }}
+            />
+            <View
+              style={{
+                position: 'absolute',
+                left: mouthX,
+                top: mouthY,
+                width: mouthW,
+                height: mouthH,
+                borderBottomLeftRadius: mouth === 'smile' ? mouthH : 2,
+                borderBottomRightRadius: mouth === 'smile' ? mouthH : 2,
+                borderTopLeftRadius: mouth === 'smile' ? 0 : 2,
+                borderTopRightRadius: mouth === 'smile' ? 0 : 2,
+                backgroundColor: 'rgba(255,255,255,0.92)',
+              }}
+            />
+          </>
         )}
-        <View
-          style={{
-            position: 'absolute',
-            left: leftX,
-            top: eyeY,
-            width: eyeW,
-            height: eyeH,
-            borderRadius: eyes === 'round' ? eyeW : 2,
-            backgroundColor: '#fff',
-          }}
-        />
-        <View
-          style={{
-            position: 'absolute',
-            left: rightX,
-            top: eyeY,
-            width: eyeW,
-            height: eyeH,
-            borderRadius: eyes === 'round' ? eyeW : 2,
-            backgroundColor: '#fff',
-          }}
-        />
-        <View
-          style={{
-            position: 'absolute',
-            left: mouthX,
-            top: mouthY,
-            width: mouthW,
-            height: mouthH,
-            borderBottomLeftRadius: mouth === 'smile' ? mouthH : 2,
-            borderBottomRightRadius: mouth === 'smile' ? mouthH : 2,
-            borderTopLeftRadius: mouth === 'smile' ? 0 : 2,
-            borderTopRightRadius: mouth === 'smile' ? 0 : 2,
-            backgroundColor: 'rgba(255,255,255,0.92)',
-          }}
-        />
       </Grad>
     </View>
   );

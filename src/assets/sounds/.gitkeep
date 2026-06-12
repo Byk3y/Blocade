@@ -1,0 +1,3 @@
+Game-feel SFX live here (move/wall/illegal/win).
+Drop .wav/.m4a files in, then wire their require()s in src/lib/feel.ts SOUND_SOURCES.
+Sound ships OFF by default until these exist.

@@ -45,3 +45,6 @@ example
 # generated native folders
 /ios
 /android
+
+# raw SFX packs (audition only — only the 4 converted wavs in src/assets/sounds ship)
+audio-source/

@@ -6,8 +6,10 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.108.1",
     "expo": "~54.0.0",
+    "expo-audio": "~1.1.1",
     "expo-constants": "~18.0.13",
     "expo-font": "~14.0.12",
+    "expo-haptics": "~15.0.8",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
     "expo-router": "~6.0.24",
@@ -36,7 +38,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node --import tsx --test src/engine/__tests__/*.test.ts"
+    "test": "node --import tsx --test 'src/**/__tests__/*.test.ts'"
   },
   "private": true
 }
