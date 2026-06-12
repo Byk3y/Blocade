@@ -97,7 +97,7 @@ export function useGame({
         0.9,
         bot.blunder * (difficultyBlunderScale[difficulty ?? 'Intermediate'] ?? 1),
       );
-      const action = chooseBotAction(state, { style: bot.style, blunder });
+      const action = chooseBotAction(state, { style: bot.style, blunder, tuning: bot.skill });
       if (!action) return; // cannot happen with the no-trap rule, but stay safe
       const res = applyAction(state, action);
       if (res.ok) {

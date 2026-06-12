@@ -1,15 +1,12 @@
 /**
- * Bot AI — five play styles per the product brief, all returning real legal
- * actions through the same rules engine the human uses.
+ * Bot AI — a single strong evaluation policy with tunable search depth, so the
+ * roster forms a *real* strength ladder instead of a dozen 1-ply clones.
  *
- *   random    — picks among legal moves, occasionally drops a random wall
- *   runner    — beelines along its shortest route, rarely blocks
- *   blocker   — hunts for walls that hurt the player's route, over-blocks
- *   balanced  — runs when ahead, blocks when behind
- *   strategic — scores every candidate action by route advantage
+ *   strength  = search depth (1 vs 2-ply negamax) + how low the blunder rate is
+ *   personality = how readily the bot reaches for walls (rootWalls + wallBias)
  *
- * `blunder` (0..1) makes weaker bots pick a worse action sometimes, so ratings
- * feel different even within a style.
+ * Everything routes through the same engine a human uses, so every action is
+ * legal and the no-trap rule is always respected.
  */
 
 import {
@@ -17,66 +14,54 @@ import {
   GameState,
   Orientation,
   PlayerId,
-  Pos,
   Wall,
+  applyAction,
   canPlaceWall,
   legalMoveTargets,
   routeDist,
-  shortestDist,
   shortestPath,
-  wallSets,
-  GOAL_ROW,
 } from './rules';
 
 export type BotStyle = 'random' | 'runner' | 'blocker' | 'balanced' | 'strategic';
 
+/** Per-bot search tuning. Strength = depth + width; wallBias is pure flavor. */
+export interface BotSkill {
+  depth: number; // 1 = greedy eval, 2 = one-ply lookahead
+  rootWalls: number; // candidate walls considered for the bot's own move
+  replyWalls: number; // candidate walls considered for the opponent's reply
+  wallBias: number; // personality nudge toward (>0) or away from (<0) walls
+}
+
 export interface BotOptions {
   style: BotStyle;
-  /** 0 = plays its best, 1 = mostly noise */
+  /** 0 = always plays its best, 1 = pure noise */
   blunder?: number;
   rng?: () => number;
+  /** overrides the style's default skill (used to grade the Advanced tier) */
+  tuning?: Partial<BotSkill>;
 }
 
-// ---- helpers ---------------------------------------------------------------
+const WIN = 1000; // dominates the eval range so a winning move is always taken
+const WALL_W = 0.15; // mild value on keeping more walls than the opponent
 
-const pick = <T,>(arr: T[], rng: () => number): T => arr[Math.floor(rng() * arr.length)];
+const randInt = (rng: () => number, n: number) => Math.floor(rng() * n);
 
-/** Distance to goal a move target would leave the bot with. */
-function distAfterMove(state: GameState, p: PlayerId, to: Pos): number {
-  return shortestDist(to, GOAL_ROW[p], wallSets(state.walls));
+// ---- evaluation ------------------------------------------------------------
+
+/** Route advantage for `player`: how much closer they are than the opponent. */
+function evalFor(state: GameState, player: PlayerId): number {
+  const opp = (1 - player) as PlayerId;
+  const me = routeDist(state, player);
+  const theirs = routeDist(state, opp);
+  return theirs - me + WALL_W * (state.players[player].wallsLeft - state.players[opp].wallsLeft);
 }
 
-/** The move that minimises the bot's remaining route. */
-function bestMove(state: GameState, p: PlayerId, rng: () => number): Action | null {
-  const targets = legalMoveTargets(state, p);
-  if (targets.length === 0) return null;
-  let best: Pos[] = [];
-  let bestD = Infinity;
-  for (const t of targets) {
-    const d = distAfterMove(state, p, t);
-    if (d < 0) continue;
-    if (d < bestD) {
-      bestD = d;
-      best = [t];
-    } else if (d === bestD) best.push(t);
-  }
-  const to = best.length ? pick(best, rng) : pick(targets, rng);
-  return { type: 'move', to };
-}
+// ---- candidate walls (pruning) --------------------------------------------
 
-function randomMove(state: GameState, p: PlayerId, rng: () => number): Action | null {
-  const targets = legalMoveTargets(state, p);
-  return targets.length ? { type: 'move', to: pick(targets, rng) } : null;
-}
-
-/**
- * Candidate walls worth scoring: every anchor touching a cell on the
- * opponent's current shortest route (that's where blocking changes anything),
- * filtered down to fully legal placements.
- */
-function candidateWalls(state: GameState, p: PlayerId): Wall[] {
-  const opp = (1 - p) as PlayerId;
-  if (state.players[p].wallsLeft <= 0) return [];
+/** Walls touching the opponent's shortest route — the only ones worth scoring. */
+function candidateWalls(state: GameState, player: PlayerId): Wall[] {
+  const opp = (1 - player) as PlayerId;
+  if (state.players[player].wallsLeft <= 0) return [];
   const path = shortestPath(state, opp) ?? [];
   const cells = [state.players[opp].pos, ...path];
   const seen = new Set<string>();
@@ -90,122 +75,108 @@ function candidateWalls(state: GameState, p: PlayerId): Wall[] {
         [0, 0],
       ]) {
         const w = { r: cell.r + dr, c: cell.c + dc, o };
-        const key = `${w.o}${w.r},${w.c}`;
+        const key = `${o}${w.r},${w.c}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        if (canPlaceWall(state, w, p).ok) out.push(w);
+        if (canPlaceWall(state, w, player).ok) out.push(w);
       }
     }
   }
   return out;
 }
 
-interface ScoredWall {
-  wall: Wall;
-  /** opponent slowdown minus self-damage */
-  score: number;
-  oppDelta: number;
-}
-
-function scoreWalls(state: GameState, p: PlayerId): ScoredWall[] {
-  const opp = (1 - p) as PlayerId;
+/** Candidate walls ranked by how much they lengthen the opponent's route. */
+function rankedWalls(state: GameState, player: PlayerId, topK: number): Wall[] {
+  if (topK <= 0 || state.players[player].wallsLeft <= 0) return [];
+  const opp = (1 - player) as PlayerId;
   const oppBefore = routeDist(state, opp);
-  const ownBefore = routeDist(state, p);
-  return candidateWalls(state, p)
-    .map((wall) => {
-      const oppDelta = routeDist(state, opp, wall) - oppBefore;
-      const ownDelta = routeDist(state, p, wall) - ownBefore;
-      return { wall, oppDelta, score: oppDelta - ownDelta };
-    })
-    .sort((a, b) => b.score - a.score);
+  return candidateWalls(state, player)
+    .map((wall) => ({ wall, gain: routeDist(state, opp, wall) - oppBefore }))
+    .sort((a, b) => b.gain - a.gain)
+    .slice(0, topK)
+    .map((x) => x.wall);
 }
 
-// ---- the styles ------------------------------------------------------------
+// ---- search ----------------------------------------------------------------
+
+function actionsFor(state: GameState, player: PlayerId, walls: number): Action[] {
+  const moves: Action[] = legalMoveTargets(state, player).map((to) => ({ type: 'move', to }));
+  const wallActs: Action[] = rankedWalls(state, player, walls).map((wall) => ({ type: 'wall', wall }));
+  return [...moves, ...wallActs];
+}
+
+/** Negamax value from the perspective of the side to move in `state`. */
+function negamax(state: GameState, depth: number, replyWalls: number): number {
+  const player = state.turn;
+  let best = -Infinity;
+  for (const a of actionsFor(state, player, replyWalls)) {
+    const res = applyAction(state, a);
+    if (!res.ok) continue;
+    let val: number;
+    if (res.state.winner !== null) val = WIN;
+    else if (depth <= 1) val = evalFor(res.state, player);
+    else val = -negamax(res.state, depth - 1, replyWalls);
+    if (val > best) best = val;
+  }
+  return best;
+}
+
+/** Pick the best action for the side to move, with a personality nudge on walls. */
+function chooseBest(state: GameState, cfg: BotSkill): Action | null {
+  const player = state.turn;
+  let best: Action | null = null;
+  let bestVal = -Infinity;
+  for (const a of actionsFor(state, player, cfg.rootWalls)) {
+    const res = applyAction(state, a);
+    if (!res.ok) continue;
+    let val: number;
+    if (res.state.winner !== null) val = WIN;
+    else if (cfg.depth <= 1) val = evalFor(res.state, player);
+    else val = -negamax(res.state, cfg.depth - 1, cfg.replyWalls);
+    if (a.type === 'wall') val += cfg.wallBias;
+    if (val > bestVal) {
+      bestVal = val;
+      best = a;
+    }
+  }
+  return best;
+}
+
+// ---- personality presets ---------------------------------------------------
+
+// Strength comes from DEPTH (1 vs 2-ply lookahead ≈ 99% win) and blunder — those
+// are the only real levers. Measurements showed search WIDTH barely matters and
+// that leaning on walls is simply stronger play, so wallBias is kept tiny: just
+// enough to flavour HOW a bot plays (a runner races, a blocker reaches for walls)
+// without flipping the rating ladder. depth-1 styles share one base policy.
+const STYLE: Record<BotStyle, BotSkill> = {
+  random: { depth: 1, rootWalls: 6, replyWalls: 0, wallBias: 0 },
+  runner: { depth: 1, rootWalls: 5, replyWalls: 0, wallBias: -0.15 }, // slight lean to racing
+  blocker: { depth: 1, rootWalls: 7, replyWalls: 0, wallBias: 0.15 }, // slight lean to walls
+  balanced: { depth: 1, rootWalls: 6, replyWalls: 0, wallBias: 0 },
+  strategic: { depth: 2, rootWalls: 6, replyWalls: 1, wallBias: 0 }, // real lookahead
+};
+
+/** A blundered action: usually a random legal move, occasionally a stray wall. */
+function randomAction(state: GameState, rng: () => number): Action | null {
+  const player = state.turn;
+  if (state.players[player].wallsLeft > 0 && rng() < 0.2) {
+    for (let i = 0; i < 10; i++) {
+      const w: Wall = { r: randInt(rng, 8), c: randInt(rng, 8), o: rng() < 0.5 ? 'h' : 'v' };
+      if (canPlaceWall(state, w, player).ok) return { type: 'wall', wall: w };
+    }
+  }
+  const moves = legalMoveTargets(state, player);
+  return moves.length ? { type: 'move', to: moves[randInt(rng, moves.length)] } : null;
+}
 
 export function chooseBotAction(state: GameState, opts: BotOptions): Action | null {
   const rng = opts.rng ?? Math.random;
   const blunder = opts.blunder ?? 0;
-  const p = state.turn;
+  const cfg: BotSkill = { ...STYLE[opts.style], ...opts.tuning };
 
-  // every style occasionally fumbles based on its blunder rating
   if (rng() < blunder) {
-    const noise = randomMove(state, p, rng);
-    if (noise) return noise;
+    return randomAction(state, rng) ?? chooseBest(state, cfg);
   }
-
-  switch (opts.style) {
-    case 'random': {
-      if (state.players[p].wallsLeft > 0 && rng() < 0.25) {
-        // try a handful of random anchors; place the first legal one
-        for (let i = 0; i < 12; i++) {
-          const w: Wall = {
-            r: Math.floor(rng() * 8),
-            c: Math.floor(rng() * 8),
-            o: rng() < 0.5 ? 'h' : 'v',
-          };
-          if (canPlaceWall(state, w, p).ok) return { type: 'wall', wall: w };
-        }
-      }
-      return randomMove(state, p, rng);
-    }
-
-    case 'runner': {
-      // rarely blocks — only a desperate wall when clearly losing the race
-      if (
-        state.players[p].wallsLeft > 0 &&
-        rng() < 0.12 &&
-        routeDist(state, p) > routeDist(state, (1 - p) as PlayerId)
-      ) {
-        const walls = scoreWalls(state, p);
-        if (walls.length && walls[0].score > 0) return { type: 'wall', wall: walls[0].wall };
-      }
-      return bestMove(state, p, rng);
-    }
-
-    case 'blocker': {
-      // walls first, asks questions later
-      if (state.players[p].wallsLeft > 0 && rng() < 0.7) {
-        const walls = scoreWalls(state, p);
-        // happy to place even mildly annoying walls
-        const annoying = walls.filter((w) => w.oppDelta > 0);
-        if (annoying.length) return { type: 'wall', wall: annoying[0].wall };
-      }
-      return bestMove(state, p, rng);
-    }
-
-    case 'balanced': {
-      const mine = routeDist(state, p);
-      const theirs = routeDist(state, (1 - p) as PlayerId);
-      if (mine <= theirs || state.players[p].wallsLeft === 0) return bestMove(state, p, rng);
-      const walls = scoreWalls(state, p);
-      if (walls.length && walls[0].score > 0) return { type: 'wall', wall: walls[0].wall };
-      return bestMove(state, p, rng);
-    }
-
-    case 'strategic': {
-      // score every action by resulting route advantage (their dist − mine)
-      const opp = (1 - p) as PlayerId;
-      const theirs = routeDist(state, opp);
-      type Scored = { action: Action; score: number };
-      const options: Scored[] = [];
-
-      for (const to of legalMoveTargets(state, p)) {
-        const d = distAfterMove(state, p, to);
-        if (d < 0) continue;
-        // +0.25 bias: with equal scores, making progress beats stalling
-        options.push({ action: { type: 'move', to }, score: theirs - d + 0.25 });
-      }
-      const mine = routeDist(state, p);
-      for (const sw of scoreWalls(state, p).slice(0, 24)) {
-        const ownAfter = mine + (sw.oppDelta - sw.score); // ownDelta = oppDelta − score
-        options.push({
-          action: { type: 'wall', wall: sw.wall },
-          score: theirs + sw.oppDelta - ownAfter,
-        });
-      }
-      if (!options.length) return randomMove(state, p, rng);
-      options.sort((a, b) => b.score - a.score);
-      return options[0].action;
-    }
-  }
+  return chooseBest(state, cfg) ?? randomAction(state, rng);
 }
